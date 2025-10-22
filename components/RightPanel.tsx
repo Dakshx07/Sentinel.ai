@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { AnalysisIssue } from '../types';
 import { ShieldIcon, ErrorIcon, SettingsIcon, ChevronDownIcon } from './icons';
@@ -12,6 +13,11 @@ interface RightPanelProps {
   onApplyFix: (issue: AnalysisIssue) => void;
   isApiKeyMissing?: boolean;
   onNavigateToSettings?: () => void;
+  appliedIssue: AnalysisIssue | null;
+  onCommitFix: () => void;
+  onRevertFix: () => void;
+  isCommitting: boolean;
+  progressText?: string;
 }
 
 const SeverityBadge: React.FC<{ severity: string; count: number }> = ({ severity, count }) => {
@@ -29,7 +35,17 @@ const SeverityBadge: React.FC<{ severity: string; count: number }> = ({ severity
   );
 };
 
-const IssueCard: React.FC<{ issue: AnalysisIssue; isSelected: boolean; onSelect: () => void; onApplyFix: () => void; }> = ({ issue, isSelected, onSelect, onApplyFix }) => {
+const IssueCard: React.FC<{
+    issue: AnalysisIssue;
+    isSelected: boolean;
+    onSelect: () => void;
+    onApplyFix: () => void;
+    isFixApplied: boolean;
+    onCommitFix: () => void;
+    onRevertFix: () => void;
+    isCommitting: boolean;
+    hasActiveFix: boolean;
+}> = ({ issue, isSelected, onSelect, onApplyFix, isFixApplied, onCommitFix, onRevertFix, isCommitting, hasActiveFix }) => {
   const isInvalidLine = issue.line === -1;
   return (
     <div className={`border rounded-lg transition-all duration-300 ${isSelected ? 'bg-brand-purple/10 border-brand-purple' : 'bg-light-secondary dark:bg-dark-primary border-gray-200 dark:border-white/10'}`}>
@@ -55,13 +71,33 @@ const IssueCard: React.FC<{ issue: AnalysisIssue; isSelected: boolean; onSelect:
             <p><span className="font-semibold text-dark-text dark:text-white">Impact:</span> {issue.impact}</p>
           </div>
           <div className="flex space-x-2 pt-2">
-            <button 
-                onClick={(e) => { e.stopPropagation(); onApplyFix(); }}
-                className="btn-primary text-xs py-1 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isInvalidLine}
-            >
-                Preview & Apply Fix
-            </button>
+            {isFixApplied ? (
+                <>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onCommitFix(); }}
+                        className="btn-primary text-xs py-1 px-3 disabled:opacity-50"
+                        disabled={isCommitting}
+                    >
+                        {isCommitting ? 'Creating PR...' : 'Create Fix PR'}
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onRevertFix(); }}
+                        className="btn-secondary bg-gray-500 hover:bg-gray-600 border-gray-500 hover:border-gray-600 text-white text-xs py-1 px-3 disabled:opacity-50"
+                        disabled={isCommitting}
+                    >
+                        Revert
+                    </button>
+                </>
+            ) : (
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); onApplyFix(); }}
+                    className="btn-primary text-xs py-1 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isInvalidLine || hasActiveFix}
+                    title={hasActiveFix ? "Another fix is active. Please commit or revert it first." : ""}
+                >
+                    Preview & Apply Fix
+                </button>
+            )}
           </div>
         </div>
       )}
@@ -69,7 +105,7 @@ const IssueCard: React.FC<{ issue: AnalysisIssue; isSelected: boolean; onSelect:
   );
 };
 
-const RightPanel: React.FC<RightPanelProps> = ({ issues, isLoading, selectedIssue, setSelectedIssue, onApplyFix, isApiKeyMissing, onNavigateToSettings }) => {
+const RightPanel: React.FC<RightPanelProps> = ({ issues, isLoading, selectedIssue, setSelectedIssue, onApplyFix, isApiKeyMissing, onNavigateToSettings, appliedIssue, onCommitFix, onRevertFix, isCommitting, progressText }) => {
   const severities = ['Critical', 'High', 'Medium', 'Low'];
   const issueCounts = severities.reduce((acc, severity) => {
     acc[severity] = issues.filter(i => i.severity === severity).length;
@@ -99,7 +135,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ issues, isLoading, selectedIssu
     }
 
     if (isLoading) {
-      return <AnalysisLoader />;
+      return <AnalysisLoader progressText={progressText} />;
     }
     
     if (issues.length === 0) {
@@ -109,21 +145,30 @@ const RightPanel: React.FC<RightPanelProps> = ({ issues, isLoading, selectedIssu
     return (
         <>
             <div className="p-4 border-b border-gray-200 dark:border-white/10">
-                <h3 className="text-lg font-bold text-dark-text dark:text-white font-heading mb-3">Sentinel Review</h3>
+                <h3 className="text-lg font-bold text-dark-text dark:text-light-text font-heading mb-3">Sentinel Review</h3>
                 <div className="flex flex-wrap gap-2">
                     {severities.map(s => issueCounts[s] > 0 && <SeverityBadge key={s} severity={s} count={issueCounts[s]} />)}
                 </div>
             </div>
             <div className="flex-grow p-4 space-y-3 overflow-y-auto">
-                {issues.sort((a, b) => severities.indexOf(a.severity) - severities.indexOf(b.severity)).map((issue, index) => (
-                    <IssueCard 
-                        key={`${issue.line}-${index}-${issue.title}`} 
-                        issue={issue}
-                        isSelected={selectedIssue === issue}
-                        onSelect={() => setSelectedIssue(selectedIssue === issue ? null : issue)}
-                        onApplyFix={() => onApplyFix(issue)}
-                    />
-                ))}
+                {issues.sort((a, b) => severities.indexOf(a.severity) - severities.indexOf(b.severity)).map((issue, index) => {
+                    const issueId = `${issue.filePath}-${issue.line}-${issue.title}`;
+                    const appliedIssueId = appliedIssue ? `${appliedIssue.filePath}-${appliedIssue.line}-${appliedIssue.title}` : null;
+                    return (
+                        <IssueCard 
+                            key={`${issue.line}-${index}-${issue.title}`} 
+                            issue={issue}
+                            isSelected={selectedIssue === issue}
+                            onSelect={() => setSelectedIssue(selectedIssue === issue ? null : issue)}
+                            onApplyFix={() => onApplyFix(issue)}
+                            isFixApplied={!!appliedIssue && appliedIssueId === issueId}
+                            onCommitFix={onCommitFix}
+                            onRevertFix={onRevertFix}
+                            isCommitting={isCommitting}
+                            hasActiveFix={!!appliedIssue}
+                        />
+                    );
+                })}
             </div>
         </>
     );

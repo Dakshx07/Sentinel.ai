@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Octokit } from 'octokit';
 import { useToast } from './ToastContext';
 import { SpinnerIcon, GithubIcon, PullRequestIcon, SettingsIcon, ShieldIcon } from './icons';
 import { DashboardView, AnalysisIssue } from '../types';
 import { analyzeCode, isApiKeySet, isDemoMode } from '../services/geminiService';
+import { parseGitHubUrl, commitFixToPrBranch } from '../services/githubService';
+import { Octokit } from 'octokit';
+
 
 declare global {
     interface Window {
@@ -33,13 +35,22 @@ const getLanguage = (filename: string) => {
     return langMap[ext || ''] || 'plaintext';
 };
 
-const IssueComment: React.FC<{ issue: AnalysisIssue }> = ({ issue }) => (
+const IssueComment: React.FC<{ issue: AnalysisIssue; onCommitFix: (issue: AnalysisIssue) => void; isCommitting: boolean; }> = ({ issue, onCommitFix, isCommitting }) => (
     <div className="border border-gray-200 dark:border-white/10 bg-light-primary dark:bg-dark-primary my-2 rounded-lg text-sm">
-        <div className={`flex items-center space-x-2 p-2 border-b border-gray-200 dark:border-white/10 ${
+        <div className={`flex items-center justify-between p-2 border-b border-gray-200 dark:border-white/10 ${
             {'Critical': 'bg-red-500/10', 'High': 'bg-orange-500/10', 'Medium': 'bg-yellow-500/10', 'Low': 'bg-blue-500/10'}[issue.severity] || ''
         }`}>
-            <ShieldIcon severity={issue.severity} className="w-5 h-5 flex-shrink-0" />
-            <span className="font-bold text-dark-text dark:text-white">{issue.title}</span>
+            <div className="flex items-center space-x-2">
+                 <ShieldIcon severity={issue.severity} className="w-5 h-5 flex-shrink-0" />
+                 <span className="font-bold text-dark-text dark:text-white">{issue.title}</span>
+            </div>
+            <button 
+                onClick={() => onCommitFix(issue)}
+                disabled={isCommitting}
+                className="btn-secondary text-xs py-1 px-3 disabled:opacity-50"
+            >
+                {isCommitting ? <SpinnerIcon className="w-4 h-4"/> : 'Commit Fix'}
+            </button>
         </div>
         <div className="p-3 space-y-2">
             <p className="text-medium-dark-text dark:text-medium-text">{issue.description}</p>
@@ -53,7 +64,7 @@ const IssueComment: React.FC<{ issue: AnalysisIssue }> = ({ issue }) => (
     </div>
 );
 
-const DiffView: React.FC<{ patch: string; issues: AnalysisIssue[] }> = ({ patch, issues }) => {
+const DiffView: React.FC<{ patch: string; issues: AnalysisIssue[]; onCommitFix: (issue: AnalysisIssue) => void; isCommitting: boolean; }> = ({ patch, issues, onCommitFix, isCommitting }) => {
     const memoizedDiff = useMemo(() => {
         if (!patch) return [];
 
@@ -120,7 +131,7 @@ const DiffView: React.FC<{ patch: string; issues: AnalysisIssue[] }> = ({ patch,
                             <div className="flex">
                                 <div className="w-10 flex-shrink-0"></div>
                                 <div className="flex-1">
-                                    {issues.map((issue, issueIdx) => <IssueComment key={issueIdx} issue={issue} />)}
+                                    {issues.map((issue, issueIdx) => <IssueComment key={issueIdx} issue={issue} onCommitFix={onCommitFix} isCommitting={isCommitting} />)}
                                 </div>
                             </div>
                         )}
@@ -137,6 +148,7 @@ const PushPullPanel: React.FC<PushPullPanelProps> = ({ setActiveView }) => {
     const [octokit, setOctokit] = useState<Octokit | null>(null);
     const [prUrl, setPrUrl] = useState('https://github.com/OWASP/wrongsecrets/pull/133');
     const [isLoading, setIsLoading] = useState(false);
+    const [isCommitting, setIsCommitting] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');
     const [changedFiles, setChangedFiles] = useState<ChangedFile[]>([]);
     const [analysisResults, setAnalysisResults] = useState<Record<string, AnalysisIssue[]>>({});
@@ -160,16 +172,16 @@ const PushPullPanel: React.FC<PushPullPanelProps> = ({ setActiveView }) => {
         }
     }, []);
 
-    const handleReview = async () => {
+    const handleReview = async (filenameToSelect?: string) => {
         if (!octokit) return;
 
-        const urlMatch = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
-        if (!urlMatch) {
+        const parsedUrl = parseGitHubUrl(prUrl);
+        if (!parsedUrl || !parsedUrl.pull) {
             addToast('Invalid GitHub Pull Request URL.', 'error');
             return;
         }
 
-        const [, owner, repo, pull_number] = urlMatch;
+        const { owner, repo, pull: pull_number } = parsedUrl;
 
         setIsLoading(true);
         setStatusMessage('Fetching changed files from PR...');
@@ -225,7 +237,9 @@ const PushPullPanel: React.FC<PushPullPanelProps> = ({ setActiveView }) => {
                     }
                 }
                 
-                const relevantIssues = issues.filter(issue => addedLinesInPatch.has(issue.line));
+                const relevantIssues = issues
+                    .filter(issue => addedLinesInPatch.has(issue.line))
+                    .map(issue => ({...issue, filePath: file.filename}));
                 return { filename: file.filename, issues: relevantIssues };
             });
 
@@ -239,8 +253,13 @@ const PushPullPanel: React.FC<PushPullPanelProps> = ({ setActiveView }) => {
             });
             
             setAnalysisResults(finalResults);
+            
             if (filesToAnalyze.length > 0) {
-                setSelectedFile(filesToAnalyze[0]);
+                let fileToReselect = null;
+                if (filenameToSelect) {
+                    fileToReselect = filesToAnalyze.find(f => f.filename === filenameToSelect);
+                }
+                setSelectedFile(fileToReselect || filesToAnalyze[0]);
             }
             setStatusMessage(`Analysis complete. Found ${Object.values(finalResults).flat().length} new issues.`);
 
@@ -249,6 +268,57 @@ const PushPullPanel: React.FC<PushPullPanelProps> = ({ setActiveView }) => {
             setStatusMessage('');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleCommitFix = async (issue: AnalysisIssue) => {
+        if (!octokit || !selectedFile || !issue.filePath) return;
+        const parsedUrl = parseGitHubUrl(prUrl);
+        if (!parsedUrl || !parsedUrl.pull) return;
+
+        const modifiedFilename = selectedFile.filename;
+        setIsCommitting(true);
+        addToast(`Applying fix for ${issue.title}...`, 'info');
+        try {
+            const { owner, repo, pull: pull_number } = parsedUrl;
+            
+            const { data: prData } = await octokit.rest.pulls.get({ owner, repo, pull_number: parseInt(pull_number) });
+            const headSha = prData.head.sha;
+            
+            const { data: contentData } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', { owner, repo, path: selectedFile.filename, ref: headSha });
+            
+            if (!('content' in contentData) || !('sha' in contentData)) throw new Error('File content or SHA not found');
+            const originalContent = atob(contentData.content);
+            const originalFileSha = contentData.sha;
+            
+            const lines = originalContent.split('\n');
+            const lineIndex = issue.line - 1;
+            if (lineIndex < 0 || lineIndex >= lines.length) throw new Error('Invalid line number in issue.');
+
+            lines.splice(lineIndex, 1, ...issue.suggestedFix.trim().split('\n'));
+            const newContent = lines.join('\n');
+
+            await commitFixToPrBranch(owner, repo, parseInt(pull_number), selectedFile.filename, newContent, originalFileSha, `fix(security): Apply Sentinel AI fix for ${issue.title}`);
+
+            addToast('Fix committed successfully! Refreshing analysis...', 'success');
+            await handleReview(modifiedFilename);
+        } catch (err: any) {
+            console.error("Failed to commit fix:", err); // Full error for debugging
+            
+            const status = err.status;
+            const message = (err.message || '').toLowerCase();
+            let userFriendlyMessage = `Failed to commit fix: ${err.message || 'An unknown error occurred.'}`;
+
+            // A 403, 404, or a specific message, indicates a permissions issue.
+            if (status === 403 || status === 404 || message.includes('resource not accessible')) {
+                 userFriendlyMessage = "Your GitHub Personal Access Token (PAT) is missing the necessary 'repo' scope. Please update your PAT in the Settings page to include the 'repo' scope. This is required for creating branches and committing code changes.";
+            } else if (status === 422) {
+                 userFriendlyMessage = `Commit failed (422): ${err.message}. The file may have been updated since you started the review.`;
+            }
+
+            addToast(userFriendlyMessage, 'error');
+        } finally {
+            setIsCommitting(false);
         }
     };
     
@@ -277,7 +347,7 @@ const PushPullPanel: React.FC<PushPullPanelProps> = ({ setActiveView }) => {
                             className="w-full bg-light-primary dark:bg-dark-primary border border-gray-300 dark:border-white/10 rounded-md p-2 pl-10 font-mono text-sm"
                         />
                     </div>
-                    <button onClick={handleReview} disabled={isLoading} className="btn-primary py-2 px-4 w-48 flex items-center justify-center disabled:opacity-50">
+                    <button onClick={() => handleReview()} disabled={isLoading || isCommitting} className="btn-primary py-2 px-4 w-48 flex items-center justify-center disabled:opacity-50">
                         {isLoading ? <SpinnerIcon className="w-5 h-5" /> : 'Review Pull Request'}
                     </button>
                 </div>
@@ -300,7 +370,7 @@ const PushPullPanel: React.FC<PushPullPanelProps> = ({ setActiveView }) => {
                          ))}
                     </div>
                     <div className="w-2/3 overflow-y-auto p-4">
-                        {selectedFile && <DiffView patch={selectedFile.patch || ''} issues={analysisResults[selectedFile.filename] || []} />}
+                        {selectedFile && <DiffView patch={selectedFile.patch || ''} issues={analysisResults[selectedFile.filename] || []} onCommitFix={handleCommitFix} isCommitting={isCommitting}/>}
                     </div>
                 </div>
             ) : !isLoading && (

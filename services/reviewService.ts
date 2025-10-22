@@ -1,3 +1,4 @@
+
 import { Repository } from '../types';
 
 const VULNERABILITIES_KEY = 'sentinel-vulnerabilities';
@@ -112,7 +113,7 @@ export const startReview = (repoId: number, repoName: string) => {
     addActivityLog('AUTOREVIEW_ENABLED', `Auto-review enabled for ${repoName}.`);
     if (!reviewInterval) {
         runReviewCycle(); // Run immediately
-        reviewInterval = setInterval(runReviewCycle, 7000) as any; // Use 'as any' to bypass TS lib check issue
+        reviewInterval = setInterval(runReviewCycle, 3000) as any; // Use 'as any' to bypass TS lib check issue
     }
 };
 
@@ -129,6 +130,17 @@ export const getDashboardData = (allRepos: Repository[]) => {
     const totalRepos = allRepos.length;
     const autoReviewCount = allRepos.filter(r => r.autoReview).length;
     const criticalCount = vulnerabilities.filter(v => v.severity === 'Critical').length;
+
+    // FIX: Calculate and include high-priority vulnerabilities to resolve property access error in the dashboard.
+    const highPriorityVulnerabilities = vulnerabilities
+        .filter(v => v.severity === 'Critical' || v.severity === 'High')
+        .sort((a, b) => {
+            const severityOrder = { 'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+            if (a.severity !== b.severity) {
+                return severityOrder[a.severity] - severityOrder[b.severity];
+            }
+            return b.timestamp - a.timestamp; // Sort by most recent if severity is the same
+        });
 
     const now = new Date();
     const fourWeeksAgo = now.getTime() - 4 * 7 * 24 * 60 * 60 * 1000;
@@ -152,6 +164,7 @@ export const getDashboardData = (allRepos: Repository[]) => {
         totalRepos,
         autoReviewCount,
         criticalCount,
+        highPriorityVulnerabilities,
         trendData,
         recentActivity,
     };

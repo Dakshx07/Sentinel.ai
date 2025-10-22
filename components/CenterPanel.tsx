@@ -39,7 +39,6 @@ const CenterPanel: React.FC<CenterPanelProps> = ({ activeFile, issues, selectedI
 
   const renderCode = () => {
     if (!activeFile) {
-        if (isLoading) return null; // Don't show "select a file" while loading the first one
         return (
             <div className="flex items-center justify-center h-full text-medium-dark-text dark:text-medium-text">
             <p>Select a file or paste a code snippet to begin analysis.</p>
@@ -54,6 +53,8 @@ const CenterPanel: React.FC<CenterPanelProps> = ({ activeFile, issues, selectedI
         const highlightedDiffHTML = useMemo(() => {
             if (!fixDiff || typeof window.hljs === 'undefined') return '';
              try {
+                // Highlight the entire diff string at once.
+                // This is more robust than splitting the HTML.
                 return window.hljs.highlight(fixDiff, { language: 'diff', ignoreIllegals: true }).value;
             } catch (e) {
                 console.error("Highlight.js error on diff:", e);
@@ -61,43 +62,10 @@ const CenterPanel: React.FC<CenterPanelProps> = ({ activeFile, issues, selectedI
             }
         }, [fixDiff]);
         
-        const diffLines = highlightedDiffHTML.split('\n');
-        const rawDiffLines = fixDiff.split('\n');
-        let newLineCounter = selectedIssue.line;
-
         return (
              <pre className="text-sm font-mono whitespace-pre-wrap break-words">
-                <code>
-                    {rawDiffLines.map((rawLine, index) => {
-                        const highlightedLine = diffLines[index] || '';
-                        let lineClass: string, marker: string, markerClass: string, oldNum: string | number, newNum: string | number;
-
-                        if (rawLine.startsWith('+') && !rawLine.startsWith('+++')) {
-                            lineClass = 'bg-green-100 dark:bg-green-900/30';
-                            marker = '+';
-                            markerClass = 'text-green-500 dark:text-green-400';
-                            oldNum = ' ';
-                            newNum = newLineCounter++;
-                        } else if (rawLine.startsWith('-') && !rawLine.startsWith('---')) {
-                            lineClass = 'bg-red-100 dark:bg-red-900/30';
-                            marker = '-';
-                            markerClass = 'text-red-500 dark:text-red-400';
-                            oldNum = selectedIssue.line;
-                            newNum = ' ';
-                        } else {
-                            lineClass = ''; marker = ' '; markerClass = ''; oldNum = ' '; newNum = ' ';
-                        }
-                        
-                        return (
-                            <div key={index} className={`flex ${lineClass}`}>
-                                <span className="w-10 flex-shrink-0 text-right pr-2 select-none text-xs text-medium-dark-text dark:text-medium-text">{oldNum}</span>
-                                <span className="w-10 flex-shrink-0 text-right pr-2 select-none text-xs text-medium-dark-text dark:text-medium-text">{newNum}</span>
-                                <span className={`w-8 flex-shrink-0 text-center font-bold select-none ${markerClass}`}>{marker}</span>
-                                <span className="flex-grow pl-2" dangerouslySetInnerHTML={{ __html: highlightedLine.substring(1) || ' ' }}/>
-                            </div>
-                        )
-                    })}
-                </code>
+                {/* Render the whole highlighted block directly */}
+                <code dangerouslySetInnerHTML={{ __html: highlightedDiffHTML }} />
             </pre>
         );
     }
@@ -133,13 +101,9 @@ const CenterPanel: React.FC<CenterPanelProps> = ({ activeFile, issues, selectedI
         {activeFile?.name || 'Code View'}
       </div>
       <div className="flex-grow overflow-y-auto">
-        {(!activeFile && isLoading) ? (
-             <div className="flex items-center justify-center h-full">
-                <SpinnerIcon className="w-6 h-6 text-brand-purple" />
-            </div>
-        ) : renderCode()}
+        {renderCode()}
       </div>
-      {isLoading && activeFile && (
+      {isLoading && (
         <div className="absolute inset-0 bg-light-secondary/50 dark:bg-dark-primary/70 backdrop-blur-sm flex items-center justify-center">
             <div className="text-center">
                 <SpinnerIcon className="w-8 h-8 text-brand-purple mx-auto" />

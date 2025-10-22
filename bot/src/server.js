@@ -29,14 +29,20 @@ if (process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS) 
         },
     });
     emailServiceMode = 'live';
-    console.log('📧 Email service configured with SMTP transport.');
+    console.log('📧 Email service configured with SMTP transport (Live Mode).');
 } else {
     // Fallback to JSON transport for simulation if not configured
     transporter = nodemailer.createTransport({
         jsonTransport: true
     });
-    console.log('⚠️ Email service running in simulation mode. No real emails will be sent.');
-    console.log('   Configure .env file to enable email sending.');
+    console.log('\n⚠️  Email service running in SIMULATION mode. No real emails will be sent.');
+    console.log('   To enable live emails, create a `.env` file in the `/bot` directory with your SMTP provider\'s details:');
+    console.log('   ---------------------------------');
+    console.log('   EMAIL_HOST="smtp.example.com"');
+    console.log('   EMAIL_PORT="587"');
+    console.log('   EMAIL_USER="your-smtp-username"');
+    console.log('   EMAIL_PASS="your-smtp-password"');
+    console.log('   ---------------------------------\n');
 }
 
 /**
@@ -77,9 +83,15 @@ app.post('/api/send-test-email', async (req, res) => {
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        // In simulation mode, info.message contains the email data
-        console.log('Email send attempt result:', info.message || info); 
-        res.status(200).json({ message: `Test email successfully sent to ${email}` });
+        
+        if (emailServiceMode === 'simulation') {
+            console.log('Email simulation successful. Data:', info.message);
+            res.status(200).json({ message: `(Simulation) Test notification logged for ${email}` });
+        } else {
+            console.log('Live email sent. Response:', info.response);
+            res.status(200).json({ message: `Test email successfully sent to ${email}` });
+        }
+        
     } catch (error) {
         console.error('Failed to send test email:', error);
         res.status(500).json({ error: 'Failed to send test email. Check server logs.' });

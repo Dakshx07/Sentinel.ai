@@ -37,7 +37,7 @@ export interface GitHubTreeItem {
 }
 
 export type AppView = 'landing' | 'pricing' | 'dashboard';
-export type DashboardView = 'repositories' | 'studio' | 'gitops' | 'commits' | 'settings' | 'docs' | 'notifications' | 'pushpull' | 'refactor' | 'team' | 'dashboard';
+export type DashboardView = 'repositories' | 'studio' | 'gitops' | 'commits' | 'settings' | 'docs' | 'notifications' | 'pushpull' | 'refactor' | 'team' | 'dashboard' | 'repoPulse' | 'workflowStreamliner';
 
 export interface GitHubProfile {
     login: string;
@@ -95,3 +95,8 @@ export interface Repository {
 }
 
 export type ToastType = 'info' | 'success' | 'error' | 'warning';
+
+export interface RefactorResult {
+    refactoredCode: string;
+    improvements: string[];
+}

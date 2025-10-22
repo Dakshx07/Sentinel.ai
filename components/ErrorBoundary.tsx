@@ -10,6 +10,9 @@ interface State {
 }
 
 class ErrorBoundary extends Component<Props, State> {
+  // FIX: Replaced public class field for state initialization with a constructor.
+  // This can resolve tooling issues where properties on `this` (like state and props)
+  // might be incorrectly flagged as non-existent in older setups.
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false };

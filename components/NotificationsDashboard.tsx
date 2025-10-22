@@ -50,7 +50,7 @@ const NotificationsDashboard: React.FC = () => {
       
       if (botStatus === 'disconnected') {
            await new Promise(resolve => setTimeout(resolve, 1000));
-           addToast(`Simulated test notification sent to ${emailAddress}.`, 'success');
+           addToast(`(Simulation) Test notification logged. No real email was sent.`, 'success');
            setIsTestingEmail(false);
            return;
       }
@@ -111,8 +111,8 @@ const NotificationsDashboard: React.FC = () => {
               </h3>
               <p className="text-sm text-medium-dark-text dark:text-medium-text mt-1">
                 { botStatus === 'live' && 'The bot server is running and configured to send real emails.' }
-                { botStatus === 'simulation' && 'The bot server is running, but no email provider is configured. No real emails will be sent.' }
-                { botStatus === 'disconnected' && 'Could not connect to the bot server. All actions will be simulated.' }
+                { botStatus === 'simulation' && 'The bot server is running, but no email provider is configured. No real emails will be sent. See server logs for setup instructions.' }
+                { botStatus === 'disconnected' && 'Could not connect to the bot server. All actions will be simulated. See the User Guide for setup instructions.' }
               </p>
            </div>
        </div>

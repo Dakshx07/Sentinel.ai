@@ -37,14 +37,14 @@ const useAnimateOnScroll = (options?: IntersectionObserverInit) => {
 
 
 const HeroSection: React.FC<{ onNavigate: (view: DashboardView) => void }> = ({ onNavigate }) => (
-    <section className="relative min-h-screen flex items-center justify-center text-center px-6 overflow-hidden bg-dark-primary">
+    <section className="relative min-h-screen flex items-center justify-center text-center px-6 overflow-hidden bg-light-primary dark:bg-dark-primary">
         <HeroAnimation />
-        <div className="absolute inset-0 bg-gradient-to-t from-dark-primary via-dark-primary/50 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-light-primary dark:from-dark-primary via-light-primary/50 dark:via-dark-primary/50 to-transparent"></div>
         <div className="relative z-10 max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold text-white font-heading uppercase tracking-wider animate-fade-in-up">
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold text-dark-text dark:text-white font-heading uppercase tracking-wider animate-fade-in-up">
                Your Digital <span className="gradient-text">Fortress</span>
             </h1>
-            <p className="mt-6 max-w-2xl mx-auto text-lg text-medium-text animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+            <p className="mt-6 max-w-2xl mx-auto text-lg text-medium-dark-text dark:text-medium-text animate-fade-in-up" style={{ animationDelay: '200ms' }}>
                 Sentinel transforms your codebase with AI-driven security, identifying complex vulnerabilities before they ever reach production.
             </p>
             <div className="mt-10 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
@@ -102,44 +102,50 @@ const TechShowcase: React.FC = () => {
 const LandingPage: React.FC<{ onNavigate: (view: AppView | DashboardView) => void }> = ({ onNavigate }) => {
   return (
     <>
-      <main className="overflow-x-hidden font-sans bg-dark-primary">
+      <main className="overflow-x-hidden font-sans bg-light-primary dark:bg-dark-primary">
         <HeroSection onNavigate={onNavigate} />
-        <div className="relative bg-light-secondary dark:bg-dark-primary pt-24">
+        <section id="features" className="relative bg-light-secondary dark:bg-dark-secondary py-24">
             <AnimatedFeatureShowcase />
-        </div>
-        <InteractiveThreatMap />
+        </section>
+        <section id="why-sentinel">
+            <InteractiveThreatMap />
+        </section>
         <TechShowcase />
       </main>
-       <footer className="bg-dark-primary text-light-text relative overflow-hidden">
-         <div className="absolute inset-0 w-full h-full opacity-30 animate-aurora" style={{
+       <footer className="bg-light-secondary dark:bg-dark-secondary text-medium-dark-text dark:text-medium-text relative overflow-hidden">
+         <div className="dark:hidden absolute inset-0 w-full h-full opacity-10" style={{
+             backgroundImage: 'radial-gradient(50% 100% at 0% 100%, #9F54FF, transparent), radial-gradient(50% 100% at 50% 0%, #00D4FF, transparent), radial-gradient(50% 100% at 100% 100%, #9F54FF, transparent)',
+             backgroundSize: '300% 100%'
+         }}></div>
+         <div className="hidden dark:block absolute inset-0 w-full h-full opacity-30 animate-aurora" style={{
              backgroundImage: 'radial-gradient(50% 100% at 0% 100%, #9F54FF, transparent), radial-gradient(50% 100% at 50% 0%, #00D4FF, transparent), radial-gradient(50% 100% at 100% 100%, #9F54FF, transparent)',
              backgroundSize: '300% 100%'
          }}></div>
         <div className="max-w-6xl mx-auto px-6 py-12 relative z-10">
             <div className="flex flex-col md:flex-row justify-between items-center">
                 <div className="flex items-center space-x-3">
-                    <SentinelLogoIcon className="w-6 h-auto"/>
-                    <span className="font-bold text-lg font-heading">Sentinel AI</span>
+                    <SentinelLogoIcon className="w-6 h-auto text-dark-text dark:text-white"/>
+                    <span className="font-bold text-lg font-heading text-dark-text dark:text-white">Sentinel AI</span>
                 </div>
                 <div className="flex space-x-6 text-sm mt-6 md:mt-0">
-                     <a href="#features" className="relative group">
+                     <a href="#features" className="relative group text-medium-dark-text dark:text-medium-text hover:text-dark-text dark:hover:text-white transition-colors">
                          <span>Features</span>
                          <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-cyan transition-all duration-300 group-hover:w-full"></span>
                      </a>
-                     <a href="#" onClick={(e)=>{ e.preventDefault(); onNavigate('pricing'); }} className="relative group">
+                     <a href="#" onClick={(e)=>{ e.preventDefault(); onNavigate('pricing'); }} className="relative group text-medium-dark-text dark:text-medium-text hover:text-dark-text dark:hover:text-white transition-colors">
                          <span>Pricing</span>
                          <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-cyan transition-all duration-300 group-hover:w-full"></span>
                      </a>
-                     <a href="#" onClick={(e)=>{ e.preventDefault(); onNavigate('studio'); }} className="relative group">
+                     <a href="#" onClick={(e)=>{ e.preventDefault(); onNavigate('studio'); }} className="relative group text-medium-dark-text dark:text-medium-text hover:text-dark-text dark:hover:text-white transition-colors">
                          <span>Launch Studio</span>
                          <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-cyan transition-all duration-300 group-hover:w-full"></span>
                      </a>
                 </div>
                  <div className="flex space-x-4 mt-6 md:mt-0">
-                    <a href="#" className="text-medium-text hover:text-white transition-transform hover:scale-110"><GithubIcon className="w-5 h-5"/></a>
+                    <a href="#" className="text-medium-dark-text dark:text-medium-text hover:text-dark-text dark:hover:text-white transition-transform hover:scale-110"><GithubIcon className="w-5 h-5"/></a>
                  </div>
             </div>
-             <div className="mt-8 pt-8 border-t border-white/10 text-center text-xs text-medium-text">
+             <div className="mt-8 pt-8 border-t border-gray-200 dark:border-white/10 text-center text-xs text-medium-dark-text dark:text-medium-text">
                 <p>&copy; 2024 Sentinel AI. All rights reserved.</p>
             </div>
         </div>

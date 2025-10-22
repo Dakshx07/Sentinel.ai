@@ -32,6 +32,23 @@ const ActivityIcon: React.FC<{ type: IActivityLog['type'] }> = ({ type }) => {
     }
 }
 
+const HighPriorityVulnerabilities: React.FC<{ vulnerabilities: IVulnerability[] }> = ({ vulnerabilities }) => (
+    <div className="lg:col-span-1 glass-effect p-6 rounded-lg flex flex-col">
+        <h3 className="font-bold text-dark-text dark:text-white font-heading mb-4">High-Priority Vulnerabilities</h3>
+        <ul className="space-y-3 flex-grow overflow-y-auto pr-2">
+            {vulnerabilities.length > 0 ? vulnerabilities.slice(0, 5).map(vuln => (
+                <li key={vuln.id} className="flex items-start space-x-3 text-sm p-2 rounded-md bg-light-primary dark:bg-dark-primary">
+                    <ShieldIcon severity={vuln.severity} className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <div className="overflow-hidden">
+                        <p className="font-semibold text-dark-text dark:text-light-text truncate" title={vuln.title}>{vuln.title}</p>
+                        <p className="text-xs text-medium-dark-text dark:text-medium-text truncate" title={vuln.repoName}>{vuln.repoName}</p>
+                    </div>
+                </li>
+            )) : <p className="text-sm text-center text-medium-dark-text dark:text-medium-text pt-8">No critical or high severity vulnerabilities found.</p>}
+        </ul>
+    </div>
+);
+
 interface PersonalDashboardProps {
     user: User | null;
     repos: Repository[];
@@ -50,37 +67,8 @@ const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ user, repos, setA
         return () => clearInterval(interval);
     }, [repos]);
     
-    const { totalRepos, autoReviewCount, criticalCount, trendData, recentActivity } = dashboardData;
+    const { totalRepos, autoReviewCount, criticalCount, highPriorityVulnerabilities, recentActivity } = dashboardData;
 
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    const textColor = isDarkMode ? '#A4A4C8' : '#4B5563';
-    
-    const trendChartOptions = {
-        series: [{
-            name: 'Vulnerabilities Found',
-            data: trendData
-        }],
-        chart: {
-            type: 'area',
-            height: 250,
-            background: 'transparent',
-            toolbar: { show: false },
-            zoom: { enabled: false }
-        },
-        dataLabels: { enabled: false },
-        stroke: { curve: 'smooth', width: 3, colors: ['#9F54FF'] },
-        fill: { type: 'gradient', gradient: { shade: 'dark', type: "vertical", shadeIntensity: 0.5, gradientToColors: [isDarkMode ? '#0A0A1F' : '#F3F4F6'], inverseColors: true, opacityFrom: isDarkMode ? 0.7 : 0.4, opacityTo: 0, stops: [0, 100] } },
-        xaxis: {
-            categories: ['4 Weeks Ago', '3 Weeks Ago', '2 Weeks Ago', 'Last Week'],
-            labels: { style: { colors: textColor } },
-            axisBorder: { show: false },
-            axisTicks: { show: false }
-        },
-        yaxis: { labels: { style: { colors: textColor } } },
-        tooltip: { theme: isDarkMode ? 'dark' : 'light' },
-        grid: { show: true, borderColor: isDarkMode ? '#A4A4C820' : '#1F293720', strokeDashArray: 4 },
-    };
-    
     if (totalRepos === 0) {
         return (
              <div className="flex flex-col items-center justify-center text-center glass-effect rounded-lg p-12 h-full animate-fade-in-up">
@@ -113,14 +101,9 @@ const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ user, repos, setA
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 glass-effect p-6 rounded-lg">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-dark-text dark:text-white font-heading">Vulnerability Trend</h3>
-                    </div>
-                    {ReactApexChart && <ReactApexChart options={trendChartOptions} series={trendChartOptions.series} type="area" height={250} />}
-                </div>
+                <HighPriorityVulnerabilities vulnerabilities={highPriorityVulnerabilities} />
 
-                <div className="lg:col-span-1 glass-effect p-6 rounded-lg flex flex-col">
+                <div className="lg:col-span-2 glass-effect p-6 rounded-lg flex flex-col">
                     <h3 className="font-bold text-dark-text dark:text-white font-heading mb-4">Recent Activity</h3>
                     <ul className="space-y-4 flex-grow overflow-y-auto pr-2">
                         {recentActivity.map(item => (

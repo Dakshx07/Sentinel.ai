@@ -1,5 +1,5 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { AnalysisIssue, CommitAnalysisIssue, GitHubCommit } from '../types';
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
+import { AnalysisIssue, CommitAnalysisIssue, GitHubCommit, RefactorResult } from '../types';
 import { setCache, getCache } from '../utils/cacheUtils';
 
 const API_KEY_LOCAL_STORAGE_KEY = 'sentinel-api-key';
@@ -128,6 +128,21 @@ const commitAnalysisSchema = {
     },
 };
 
+const refactorCodeSchema = {
+    type: Type.OBJECT,
+    properties: {
+        refactoredCode: { type: Type.STRING, description: "A string containing the complete, refactored code." },
+        improvements: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.STRING,
+                description: "A brief explanation of a change that was made."
+            }
+        },
+    },
+    required: ["refactoredCode", "improvements"],
+};
+
 const getLanguageInstruction = (language: string): string => {
     const lang = language.toLowerCase();
     if (lang.includes('python')) {
@@ -184,21 +199,20 @@ export const analyzeCode = async (code: string, language: string = 'plaintext'):
             const ai = getAiClient();
             const languageSpecificInstruction = getLanguageInstruction(language);
             const systemInstruction = localStorage.getItem(SYSTEM_INSTRUCTION_LOCAL_STORAGE_KEY) || DEFAULT_SYSTEM_INSTRUCTION;
-            const maxOutputTokens = localStorage.getItem(MAX_OUTPUT_TOKENS_LOCAL_STORAGE_KEY);
-            const modelConfig: any = { systemInstruction, responseMimeType: "application/json", responseSchema: codeAnalysisSchema, thinkingConfig: { thinkingBudget: 0 } };
-            if (maxOutputTokens && !isNaN(parseInt(maxOutputTokens, 10)) && parseInt(maxOutputTokens, 10) > 0) {
-                modelConfig.maxOutputTokens = parseInt(maxOutputTokens, 10);
-            }
-
-            // Prepend line numbers to the code to ensure AI returns accurate line numbers
+            
             const codeWithLines = code.split('\n').map((line, index) => `${index + 1}: ${line}`).join('\n');
-            const prompt = `${languageSpecificInstruction}\n\nReview the following code, which has line numbers prepended to each line. For each issue you find, you MUST use the prepended line number in your response. Provide the severity (Critical, High, Medium, Low), a concise title, a detailed description of the problem, its potential impact, and a concrete code snippet for the suggested fix. Adhere strictly to the JSON schema.\n\nCODE:\n\`\`\`${language}\n${codeWithLines}\n\`\`\``;
+            const contents = `Review the following code, which has line numbers prepended to each line. For each issue you find, you MUST use the prepended line number in your response. \n\nCODE:\n${codeWithLines}`;
 
-            const response = await ai.models.generateContent({
+            const response: GenerateContentResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: prompt,
-                config: modelConfig,
+                contents,
+                config: {
+                    systemInstruction: `${systemInstruction} ${languageSpecificInstruction}`,
+                    responseMimeType: "application/json",
+                    responseSchema: codeAnalysisSchema,
+                },
             });
+
             const jsonString = response.text.trim();
             const apiResult = JSON.parse(jsonString);
             if (!Array.isArray(apiResult)) throw new Error("The AI model returned data in an unexpected format (not an array).");
@@ -231,15 +245,17 @@ export const analyzeCommitHistory = async (commits: GitHubCommit[]): Promise<Com
         const result = await withRetry(async () => {
             const ai = getAiClient();
             const systemInstruction = "You are a security analyst specializing in Git history. Analyze the following commit data for potential security risks. Look for exposed secrets (API keys, passwords), suspicious keywords ('hack', 'workaround', 'disable security'), and other red flags. For each flagged commit, you MUST provide a title, a detailed description, your reasoning, a suggested remediation, and a simple 'plainLanguageSummary' of the change. Only return issues for commits that have a clear, high-confidence security risk. Do not flag common messages like 'fix bug' or 'update feature'.";
-            const maxOutputTokens = localStorage.getItem(MAX_OUTPUT_TOKENS_LOCAL_STORAGE_KEY);
-            const modelConfig: any = { systemInstruction, responseMimeType: "application/json", responseSchema: commitAnalysisSchema, thinkingConfig: { thinkingBudget: 0 } };
-            if (maxOutputTokens && !isNaN(parseInt(maxOutputTokens, 10)) && parseInt(maxOutputTokens, 10) > 0) {
-                modelConfig.maxOutputTokens = parseInt(maxOutputTokens, 10);
-            }
-            const response = await ai.models.generateContent({
+            
+            const contents = `Analyze these commits:\n${JSON.stringify(commitDataForAnalysis, null, 2)}`;
+
+            const response: GenerateContentResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: `Analyze the following list of Git commits and identify any that contain potential security risks. Adhere strictly to the JSON schema.\n\nCOMMITS:\n${JSON.stringify(commitDataForAnalysis, null, 2)}`,
-                config: modelConfig,
+                contents,
+                config: {
+                    systemInstruction,
+                    responseMimeType: "application/json",
+                    responseSchema: commitAnalysisSchema,
+                },
             });
             const jsonString = response.text.trim();
             const apiResult = JSON.parse(jsonString);
@@ -253,30 +269,44 @@ export const analyzeCommitHistory = async (commits: GitHubCommit[]): Promise<Com
     }
 };
 
-export const refactorCode = async (code: string, language: string): Promise<string> => {
+export const refactorCode = async (code: string, language: string): Promise<RefactorResult> => {
     if (isDemoMode()) {
         await sleep(1500);
-        const mockRefactor = `def get_product(product_id):\n    # FIX: Use parameterized query to prevent SQL injection\n    conn = get_db_connection()\n    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()\n    conn.close()\n    return product`;
+        const mockRefactor = {
+            refactoredCode: `def get_product(product_id):\n    # FIX: Use parameterized query to prevent SQL injection\n    conn = get_db_connection()\n    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()\n    conn.close()\n    return product`,
+            improvements: [
+                "Replaced direct string formatting with a parameterized query to prevent SQL Injection vulnerabilities.",
+                "Maintained original function signature and return value for compatibility."
+            ]
+        };
         return Promise.resolve(mockRefactor);
     }
     
-    const cacheKey = createCacheKey(`refactor-${language}:${code}`);
-    const cachedResult = getCache<string>(cacheKey);
+    const cacheKey = createCacheKey(`refactor-v2-${language}:${code}`);
+    const cachedResult = getCache<RefactorResult>(cacheKey);
     if (cachedResult) return cachedResult;
 
     try {
         const result = await withRetry(async () => {
             const ai = getAiClient();
-            const response = await ai.models.generateContent({
+            const systemInstruction = `You are an expert code refactoring agent. Your task is to rewrite the given code to improve its security, performance, and readability, without changing its core functionality. Respond ONLY with a single JSON object matching the provided schema.`;
+            const contents = `LANGUAGE: ${language}\n\nCODE:\n\`\`\`${language}\n${code}\n\`\`\``;
+            
+            const response: GenerateContentResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: `You are an expert code refactoring agent. Your task is to rewrite the given code to improve its security, performance, and readability, without changing its core functionality. Respond only with the refactored code inside a single code block. Do not add explanations or introductions.\n\nLANGUAGE: ${language}\n\nCODE:\n\`\`\`${language}\n${code}\n\`\`\``,
-                config: { thinkingConfig: { thinkingBudget: 0 } },
+                contents,
+                config: {
+                    systemInstruction,
+                    responseMimeType: "application/json",
+                    responseSchema: refactorCodeSchema,
+                }
             });
-            const responseText = response.text.trim();
-            const codeBlockRegex = /```(?:\w+)?\n([\s\S]+?)\n```/;
-            const match = responseText.match(codeBlockRegex);
-            const extractedCode = (match && match[1]) ? match[1] : responseText;
-            return extractedCode;
+            const jsonString = response.text.trim();
+            const apiResult = JSON.parse(jsonString);
+            if (typeof apiResult.refactoredCode !== 'string' || !Array.isArray(apiResult.improvements)) {
+                 throw new Error("The AI model returned data in an unexpected format.");
+            }
+            return apiResult as RefactorResult;
         });
         setCache(cacheKey, result);
         return result;
@@ -284,3 +314,60 @@ export const refactorCode = async (code: string, language: string): Promise<stri
         handleGeminiError(error, 'code refactoring');
     }
 }
+
+export const summarizeRepoActivity = async (commits: { message: string }[], pullRequests: { title: string }[]): Promise<string> => {
+    if (isDemoMode()) {
+        await sleep(1000);
+        return "This week saw a major refactor of the authentication system and the introduction of a new user dashboard feature. Several critical security bugs related to XSS were also patched.";
+    }
+
+    const cacheKey = createCacheKey(`summary:${JSON.stringify(commits)}:${JSON.stringify(pullRequests)}`);
+    const cachedResult = getCache<string>(cacheKey);
+    if (cachedResult) return cachedResult;
+
+    try {
+        const result = await withRetry(async () => {
+            const ai = getAiClient();
+            
+            const commitMessages = commits.map(c => c.message.split('\n')[0]).slice(0, 20); // First line of last 20 commits
+            const prTitles = pullRequests.map(p => p.title).slice(0, 10); // Last 10 PRs
+
+            const contents = `You are a tech lead providing a weekly digest for a manager. Summarize the key activities from the following git commit messages and pull request titles. Focus on new features, major bug fixes, and overall project momentum. Keep it concise (2-3 sentences max) and in a professional, high-level tone.\n\nRecent Commits:\n- ${commitMessages.join('\n- ')}\n\nRecent Pull Requests:\n- ${prTitles.join('\n- ')}`;
+
+            const response: GenerateContentResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents,
+            });
+            return response.text;
+        });
+        setCache(cacheKey, result);
+        return result;
+    } catch (error: any) {
+        handleGeminiError(error, 'repository activity summary');
+    }
+};
+
+export const queryRepoInsights = async (question: string, fileContents: { name: string, content: string }[]): Promise<string> => {
+    if (isDemoMode()) {
+        await sleep(1000);
+        return `Based on the provided files, the primary goal seems to be creating a secure web application. For your question "${question}", the most relevant file is likely \`app.py\`, which contains a critical SQL injection vulnerability that needs to be addressed using parameterized queries.`;
+    }
+
+    try {
+        const result = await withRetry(async () => {
+            const ai = getAiClient();
+            
+            const contextString = fileContents.map(f => `--- FILE: ${f.name} ---\n${f.content.substring(0, 2000)}`).join('\n\n');
+            const contents = `You are a helpful AI assistant for a software developer. Based on the provided file snippets from a repository, answer the user's question. Provide a concise, helpful response, and mention which file is most relevant to the answer if applicable.\n\nCONTEXT:\n${contextString}\n\nQUESTION: ${question}`;
+
+            const response: GenerateContentResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents,
+            });
+            return response.text;
+        });
+        return result;
+    } catch (error: any) {
+        handleGeminiError(error, 'repository insight query');
+    }
+};

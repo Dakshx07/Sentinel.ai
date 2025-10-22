@@ -4,6 +4,7 @@ import { parseGitHubUrl, getRepoCommits } from '../services/githubService';
 import { analyzeCommitHistory, isApiKeySet, isDemoMode } from '../services/geminiService';
 import { GitHubCommit, CommitAnalysisIssue, User } from '../types';
 import { useToast } from './ToastContext';
+import AnalysisLoader from './AnalysisLoader';
 
 type Tab = 'details' | 'analysis';
 
@@ -138,6 +139,14 @@ const CommitScanner: React.FC<{ user: User, onNavigateToSettings: () => void }> 
     );
 
     const MainContent = () => {
+        if (isLoading) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full bg-light-secondary dark:bg-dark-primary">
+                    <AnalysisLoader />
+                </div>
+            );
+        }
+
         if (error) {
              return <ErrorMessage message={error} onNavigateToSettings={onNavigateToSettings} />;
         }

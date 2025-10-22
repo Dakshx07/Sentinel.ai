@@ -13,7 +13,7 @@
     "@google/genai": "^1.17.0",
     "react-dom": "^19.1.1",
     "octokit": "^3.2.0",
-    "three": "0.167.0"
+    "three": "^0.167.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

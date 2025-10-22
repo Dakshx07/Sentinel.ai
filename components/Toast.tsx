@@ -3,7 +3,7 @@ import { XIcon, ErrorIcon, CheckIcon, InfoIcon, WarningIcon } from './icons';
 import { ToastType } from '../types';
 
 interface ToastProps {
-  message: string;
+  message: React.ReactNode;
   type: ToastType;
   onDismiss: () => void;
 }

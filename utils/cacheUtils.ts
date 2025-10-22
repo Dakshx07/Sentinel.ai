@@ -1,3 +1,4 @@
+
 const CACHE_PREFIX = 'sentinel-cache-';
 const DEFAULT_TTL = 3600 * 1000; // 1 hour in milliseconds
 

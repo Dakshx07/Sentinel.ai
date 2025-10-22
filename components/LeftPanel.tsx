@@ -90,20 +90,20 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   const TabButton = ({ mode, icon, label }: { mode: InputMode, icon: React.ReactNode, label: string }) => (
     <button
       onClick={() => setInputMode(mode)}
-      className={`flex-1 flex items-center justify-center p-3 text-sm font-medium border-b-2 transition-colors ${inputMode === mode ? 'text-brand-purple border-brand-purple' : 'text-medium-dark-text dark:text-medium-text border-transparent hover:bg-gray-100 dark:hover:bg-white/5'}`}
+      className={`flex-1 flex items-center justify-center p-3 text-sm font-medium border-b-2 transition-colors ${inputMode === mode ? 'text-brand-purple border-brand-cyan' : 'text-medium-dark-text dark:text-medium-text border-transparent hover:bg-gray-100 dark:hover:bg-white/5'}`}
     >
-      {icon}
-      <span className="ml-2">{label}</span>
+      <span className={inputMode === mode ? 'text-brand-cyan' : ''}>{icon}</span>
+      <span className={`ml-2 ${inputMode === mode ? 'gradient-text' : ''}`}>{label}</span>
     </button>
   );
 
   return (
-    <div className="bg-light-secondary dark:bg-dark-secondary border-r border-gray-200 dark:border-white/10 flex flex-col h-full">
+    <div className="bg-light-secondary dark:bg-dark-secondary border-r border-gray-200 dark:border-white/10 grid grid-rows-[auto_1fr] h-full">
       <div className="flex border-b border-gray-200 dark:border-white/10">
         <TabButton mode={InputMode.Snippet} icon={<CodeIcon className="w-5 h-5" />} label="Snippet" />
         <TabButton mode={InputMode.SampleRepo} icon={<RepoIcon className="w-5 h-5" />} label="Samples" />
       </div>
-      <div className="flex-grow overflow-y-auto">
+      <div className="overflow-y-auto">
         {renderContent()}
       </div>
     </div>

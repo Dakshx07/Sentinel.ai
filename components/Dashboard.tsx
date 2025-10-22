@@ -12,6 +12,8 @@ import RefactorSimulator from './RefactorSimulator';
 import TeamCollab from './TeamCollab';
 import ErrorBoundary from './ErrorBoundary';
 import PersonalDashboard from './PersonalDashboard';
+import RepoPulseDashboard from './RepoPulseDashboard';
+import DevWorkflowStreamliner from './DevWorkflowStreamliner';
 import { User, DashboardView, Repository } from '../types';
 import { isDemoMode } from '../services/geminiService';
 import DemoModeBanner from './DemoModeBanner';
@@ -62,6 +64,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, activeView, setActiveView, 
                 return <RefactorSimulator onNavigateToSettings={navigateToSettings} />;
             case 'team':
                 return <TeamCollab />;
+            case 'repoPulse':
+                return <RepoPulseDashboard repos={repos} user={user} />;
+            case 'workflowStreamliner':
+                return <DevWorkflowStreamliner repos={repos} user={user} onNavigateToSettings={navigateToSettings} />;
             default:
                 return <PersonalDashboard user={user} repos={repos} setActiveView={setActiveView} />;
         }

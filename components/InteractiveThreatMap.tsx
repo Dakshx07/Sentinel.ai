@@ -25,7 +25,7 @@ const InteractiveThreatMap: React.FC = () => {
         // Globe
         const globeGeometry = new THREE.SphereGeometry(5, 64, 64);
         const globeMaterial = new THREE.MeshPhongMaterial({
-            color: 0x0A0A1F,
+            color: document.documentElement.classList.contains('dark') ? 0x0A0A1F : 0xE1E1FF,
             shininess: 10,
             transparent: true,
             opacity: 0.9,
@@ -127,11 +127,11 @@ const InteractiveThreatMap: React.FC = () => {
     }, []);
     
     return (
-        <section className="relative h-[600px] w-full bg-dark-primary flex flex-col items-center justify-center text-center px-6 overflow-hidden">
+        <section className="relative h-[600px] w-full bg-light-primary dark:bg-dark-primary flex flex-col items-center justify-center text-center px-6 overflow-hidden">
              <div ref={mountRef} className="absolute inset-0 z-0" />
              <div className="relative z-10 max-w-3xl mx-auto">
-                 <h2 className="text-4xl md:text-5xl font-bold text-white font-heading animate-fade-in-up">Global Threat Intelligence</h2>
-                 <p className="mt-4 text-lg text-medium-text max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                 <h2 className="text-4xl md:text-5xl font-bold text-dark-text dark:text-white font-heading animate-fade-in-up">Global Threat Intelligence</h2>
+                 <p className="mt-4 text-lg text-medium-dark-text dark:text-medium-text max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: '200ms' }}>
                     Sentinel is constantly updated with the latest vulnerability patterns, ensuring your code is protected against emerging threats from around the world.
                  </p>
              </div>

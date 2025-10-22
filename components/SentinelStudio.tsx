@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import LeftPanel from './LeftPanel';
 import CenterPanel from './CenterPanel';
@@ -175,6 +176,11 @@ const SentinelStudio: React.FC<SentinelStudioProps> = ({ onNavigateToSettings })
           issues={issues} isLoading={isLoading} selectedIssue={selectedIssue}
           setSelectedIssue={setSelectedIssue} onApplyFix={handleApplyFix}
           isApiKeyMissing={apiKeyMissing} onNavigateToSettings={onNavigateToSettings}
+          // FIX: Add missing props for commit/revert functionality, which is not used in the Studio.
+          appliedIssue={null}
+          onCommitFix={() => {}}
+          onRevertFix={() => {}}
+          isCommitting={false}
         />
       </div>
     </div>
